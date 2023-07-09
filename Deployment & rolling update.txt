@@ -1,0 +1,228 @@
+==============Pod===============================
+# k get ns
+# k config set-context --current --namespace=sandeep
+# k get pods
+# k run pod --image=nginx
+# k get pods
+# k delete pods pod
+
+=========================ReplicationCOntroller=====
+# vim rc.yml           ---->Source (kubernetes.io)
+# k create -f rc.yml --dry-run
+# k create -f rc.yml
+# k get rc
+# k get pods
+# k describe pod|grep -i controlled
+# k delete pod --all
+# k get pods
+# k scale --replicas=20 rc nginx
+# k get pods
+# k edit rc nginx    --->replicas: 2
+# k get rc
+# k get pods
+# k delete -f rc.yml
+# k get pods
+# k get rc
+
+
+=============================ReplicaSet==========
+
+# vim rs.yml
+# k create -f rs.yml --dry-run
+# k explain rs --recursive|less
+# vim rs.yml
+# k create -f rs.yml
+# k get rs
+# k get pods
+# k get pods --show-labels
+# k get rs --show-labels
+# k scale --replicas=20 rc frontend
+# k get rs --show-labels
+# k get pods --show-labels
+# k scale --replicas=20 rs frontend
+# k get pods --show-labels
+# k edit rs frontend     --->replicas: 2
+# k get rs --show-labels
+# k get pods --show-labels
+# k delete rs frontend --cascade=false
+# k get rs
+# k get pods --show-labels
+# k delete pod -l tier=frontend
+# k get all
+# k delete rs --all
+
+==============================Deployment========
+# k get deploy
+# k create deploy test --image=nginx:1.18
+# k get deploy
+# k get pods
+# k api-resources|grep -i deploy   ---> To chk short cut name & all the available resoucres & supported namespaces.
+# k describe deploy
+# k get deploy
+# k scale --replicas=20 deploy test
+# k get deploy
+# k get pods --show-labels
+# k get deploy test -o yaml
+# k describe deploy test|grep -i image
+# k set image deploy test nginx=nginx:1.19   --->Rolling Update
+# k get rs
+# k describe deploy test|grep -i image
+# k edit deploy test
+# k get rs
+# k rollout history deploy                  ---->To check versioning or rolling update history like yum history
+
+OR if we have single deployment other wise mention deployment name.
+
+# k rollout history deploy test   
+# k rollout history deploy test --revision=1   ---> get details about versioning 1 & lite yum history info.
+# k rollout history deploy test --revision=2
+# k rollout history deploy
+# k rollout undo deploy test --to-revision=1   ----> To Roll Out 
+# k set image deploy test nginx=nginx:1.20
+# k set image deploy test nginx=nginx:1.23
+# k set image deploy test nginx=nginx:1.24
+# k rollout history deploy
+# k set image deploy test nginx=nginx:hgkghg
+# k get pods
+# k get deploy test -o yaml|grep -i max
+# k get pods
+# k get rs
+# k set image deploy test nginx=nginx:latest
+# k describe deploy
+# k delete rs --all
+# k get deploy
+# k get rs
+# k rollout history deploy
+# k rollout history deploy --revision=9
+# k edit deploy test
+# k set image deploy test nginx=nginx:1.24
+# k describe deploy
+# k get rs
+# k edit deploy test
+# k scale --replias=10 deploy test
+# k scale --replicas=10 deploy test
+# k set image deploy test nginx=nginx:fhgffjgjjj
+# k get pods
+# k get rs
+# k get pods
+# k rollout hstory deploy
+# k rollout history deploy
+# k rollout history deploy --revision=9
+# k rollout undo deploy --to-revision=9
+# k get rs
+# k delete rs --all
+# k get rs
+# k get deploy
+# k delete deploy test --cascade=false     ----> To delete deploy only (so now we have rs & pods pending)
+# k get deploy
+# k get pods --show-labels
+# k delete pod -l app=test,pod-template-hash=6975966f74  ----> We deleted pods but created agaian as now rs controlling these pods.
+# k get pods
+# k get deploy
+# k get rs
+# k delete rs test-6975966f74  --->So now delete rs & then all pod will be deleting.
+
+==========
+# k create deploy test --image=nginx
+# k scale --replicas=10 deploy test
+# k get deploy
+NAME   READY   UP-TO-DATE   AVAILABLE   AGE
+test   10/10   10           10          11s
+
+# k get rs
+NAME              DESIRED   CURRENT   READY   AGE
+test-5746d4c59f   10        10        10      13s
+
+# k delete deploy test --cascade=false
+warning: --cascade=false is deprecated (boolean value) and can be replaced with --cascade=orphan.
+deployment.apps "test" deleted
+
+# k get rs   ---->Still here bcoz you deleted deploy only with (--cascade=false) (as deploy --->rs---->pods)
+NAME              DESIRED   CURRENT   READY   AGE
+test-5746d4c59f   10        10        10      39s
+# k delete rs test-5746d4c59f     ---> So delete the rs also to delete pod also.
+replicaset.apps "test-5746d4c59f" deleted
+==========
+
+
+
+=========================Strategy====================================================================
+Syntax:-
+Strategy:
+  rollingUpdates:
+    maxSurge: 25%
+	maxUnavailable: 25%
+------------------------
+
+# k get deploy test -o yaml|grep -i max    ----> See Rolling Update Strategy is:-
+      maxSurge: 25%
+      maxUnavailable: 25%
+	  
+# k set image deploy test nginx=nginx:hgkghg    ---> Now we given wrong image so the conatiner will not be created.
+
+# k get pods                                   
+NAME                    READY   STATUS         RESTARTS   AGE
+test-78fb9969d8-6gv4z   1/1     Running        0          59s
+test-78fb9969d8-78hrr   1/1     Running        0          58s
+test-78fb9969d8-rgqmn   1/1     Running        0          57s
+test-c68dbc6d5-4qwrz    0/1     ErrImagePull   0          12s
+test-c68dbc6d5-8kgzl    0/1     ErrImagePull   0          12s
+
+-----------------------------------
+Note:-
+
+ ---> See here due to (maxSurge: 25% & maxUnavailable: 25%) ---> 1 new pod is created on above the desired pod i.e
+Existing Pod: 3 (as 1 become unavaibale as per maxUnavaialbe: 25%)
+New Pod created with image nginx:hgkghg: 1pod, so he is not geeting the image hence give error like ErrImagePull
+Existing pod is down: 1
+so the total pod with error is 2(existing pod)+1(newpod)=2pods
+-----------------------------------
+
+# k get rs
+NAME              DESIRED   CURRENT   READY   AGE
+test-649f7485c9   0         0         0       3m23s
+test-6b78c8c4d    0         0         0       3m40s
+test-75cb8d65d5   0         0         0       19m
+test-7645765d4    0         0         0       14m
+test-78fb9969d8   3         3         3       2m58s
+test-c68dbc6d5    2         2         0       2m11s
+---------------------
+Note:-
+See new rs is created with 2 down pods as the image is not correct.
+
+---------------------
+
+# k get deploy test -o yaml|grep -i max    ----> See Rolling Update Strategy is:-
+      maxSurge: 10%
+      maxUnavailable: 90%
+	  
+# k set image deploy test nginx=nginx:fhgffjgjjj
+# k get pods
+NAME                    READY   STATUS         RESTARTS   AGE
+test-67c4b8fd57-5lgwk   0/1     ErrImagePull   0          13s
+test-67c4b8fd57-6wljt   0/1     ErrImagePull   0          13s
+test-67c4b8fd57-85vtd   0/1     ErrImagePull   0          13s
+test-67c4b8fd57-8tzpg   0/1     ErrImagePull   0          13s
+test-67c4b8fd57-bvvps   0/1     ErrImagePull   0          13s
+test-67c4b8fd57-hpflm   0/1     ErrImagePull   0          13s
+test-67c4b8fd57-j9mv4   0/1     ErrImagePull   0          13s
+test-67c4b8fd57-p7vrt   0/1     ErrImagePull   0          13s
+test-67c4b8fd57-xsk5f   0/1     ErrImagePull   0          13s
+test-67c4b8fd57-zkxl6   0/1     ErrImagePull   0          13s
+test-78fb9969d8-p6bn5   1/1     Running        0          2m15s
+# k get rs
+NAME              DESIRED   CURRENT   READY   AGE
+test-67c4b8fd57   10        10        0       36s
+test-6975966f74   0         0         0       4m26s
+test-78fb9969d8   1         1         1       2m38s
+
+
+Note:-
+
+ ---> See here due to (maxSurge: 10% & maxUnavailable: 90%) ---> 1 new pod is created on above the desired pod i.e
+Existing Pod: 1 (as 9 become unavaibale as per maxUnavaialbe: 90%)
+New Pod created with image nginx:fhgffjgjjj: 1pod, so he is not geeting the image hence give error like ErrImagePull
+Existing pod is down: 9 
+so the total pod with error is 9(existing pod)+1(newpod)=10pods
+
+=============================================================================================
